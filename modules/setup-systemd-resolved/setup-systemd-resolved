@@ -2,8 +2,7 @@
 # Configure systemd-resolved it to forward requests for a specific domain to Consul. This script has been tested
 # with the following operating systems:
 #
-# 1. Ubuntu 18.04
-# 1. Ubuntu 20.04
+# 1. Ubuntu 22.04
 # See https://learn.hashicorp.com/consul/security-networking/forwarding#systemd-resolved-setup for more details
 # Github Issue: https://github.com/hashicorp/consul/issues/4155
 
@@ -81,21 +80,26 @@ function configure_systemd_resolved {
   local -r consul_domain="$1"
   local -r consul_ip="$2"
   local -r consul_port="$3"
+  
+  sudo sed -i "s/#DNS=/DNS=${consul_ip}:${consul_port}/g" "$SYSTEMD_RESVOLDED_CONFIG_FILE"
+  sudo sed -i "s/#Domains=/Domains=~${consul_domain}/g" "$SYSTEMD_RESVOLDED_CONFIG_FILE"
+  
+  # We do not need to setup iptables nat forwarding any longer
 
-  UBUNTU_VERSION=`lsb_release -s -r`
-  if [ "$UBUNTU_VERSION" == "18.04" ] || [ "$UBUNTU_VERSION" == "20.04" ]; then
-    log_info "Configuring systemd-resolved to forward lookups of the '$consul_domain' domain to $consul_ip:$consul_port in $CONSUL_DNS_MASQ_CONFIG_FILE"
+  # UBUNTU_VERSION=`lsb_release -s -r`
+  # if [ "$UBUNTU_VERSION" == "22.04" ]; then
+  #   log_info "Configuring systemd-resolved to forward lookups of the '$consul_domain' domain to $consul_ip:$consul_port in $CONSUL_DNS_MASQ_CONFIG_FILE"
 
-    sudo iptables -t nat -A OUTPUT -d localhost -p udp -m udp --dport 53 -j REDIRECT --to-ports $consul_port
-    sudo iptables -t nat -A OUTPUT -d localhost -p tcp -m tcp --dport 53 -j REDIRECT --to-ports $consul_port
-    sudo iptables-save | sudo tee /etc/iptables/rules.v4
-    sudo ip6tables-save | sudo tee /etc/iptables/rules.v6
-    sudo sed -i "s/#DNS=/DNS=${consul_ip}/g" "$SYSTEMD_RESVOLDED_CONFIG_FILE"
-    sudo sed -i "s/#Domains=/Domains=~${consul_domain}/g" "$SYSTEMD_RESVOLDED_CONFIG_FILE"
-  else
-    log_error "Cannot install on this OS."
-    exit 1
-  fi
+  #   sudo iptables -t nat -A OUTPUT -d localhost -p udp -m udp --dport 53 -j REDIRECT --to-ports $consul_port
+  #   sudo iptables -t nat -A OUTPUT -d localhost -p tcp -m tcp --dport 53 -j REDIRECT --to-ports $consul_port
+  #   sudo iptables-save | sudo tee /etc/iptables/rules.v4
+  #   sudo ip6tables-save | sudo tee /etc/iptables/rules.v6
+  #   sudo sed -i "s/#DNS=/DNS=${consul_ip}/g" "$SYSTEMD_RESVOLDED_CONFIG_FILE"
+  #   sudo sed -i "s/#Domains=/Domains=~${consul_domain}/g" "$SYSTEMD_RESVOLDED_CONFIG_FILE"
+  # else
+  #   log_error "Cannot install on this OS."
+  #   exit 1
+  # fi
 }
 
 function install {
@@ -137,7 +141,7 @@ function install {
   done
 
   log_info "Configuring systemd-resolved"
-  install_dependencies
+  # install_dependencies
   configure_systemd_resolved "$consul_domain" "$consul_ip" "$consul_dns_port"
   log_info "systemd-resolved configured!"
 }
